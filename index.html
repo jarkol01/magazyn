@@ -110,6 +110,26 @@
   .person li .nm{flex:1;word-break:break-word}
   .person li .ret{flex:none}
 
+  /* --- mapa warsztatu --- */
+  .map-toolbar{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+  .map-toolbar .btn.on{background:var(--acc);border-color:var(--acc);color:var(--acc-dk)}
+  #map-svg{width:100%;height:auto;display:block;background:var(--panel);
+    border:1px solid var(--line);border-radius:14px;touch-action:none;user-select:none}
+  .map-grid{stroke:#1f2731;stroke-width:.25}
+  .mel{cursor:pointer}
+  .mel-wall{fill:#4a5a6e}
+  .mel-loc{fill:#173052;stroke:#58a6ff;stroke-width:.5}
+  .mel-obj{fill:#242e3a;stroke:#39485a;stroke-width:.5}
+  .mel.hl{fill:var(--acc);stroke:var(--acc);animation:mapPulse .9s infinite}
+  .mel.sel{stroke:var(--acc);stroke-width:1;stroke-dasharray:2.5 1.5}
+  .mel.prev{fill:var(--acc);fill-opacity:.4;stroke:var(--acc);stroke-dasharray:2 1}
+  .mel-lbl{fill:#cfdae6;font-size:3.6px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+  .handle{fill:var(--acc)}
+  @keyframes mapPulse{50%{opacity:.4}}
+  .mini-map{background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    margin:8px 0;overflow:hidden}
+  .mini-map svg{display:block;width:100%;height:auto}
+
   /* --- historia --- */
   .logline{display:flex;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px}
   .logline .t{color:var(--mut);flex:none;width:88px;font-size:12.5px;padding-top:2px}
@@ -169,6 +189,25 @@
     <div class="chips" id="loc-chips"></div>
     <div class="chips" id="st-chips"></div>
     <div id="items-list"></div>
+  </section>
+
+  <!-- ============ MAPA ============ -->
+  <section class="tab" id="tab-map">
+    <div class="map-toolbar">
+      <button class="btn" id="map-edit-btn" onclick="toggleMapEdit()">✏️ Edytuj mapę</button>
+      <span id="map-add-row" style="display:none;gap:6px">
+        <button class="btn" id="map-add-wall" onclick="armMap('wall')">➕ Ściana</button>
+        <button class="btn" id="map-add-loc" onclick="armMap('loc')">➕ Magazyn</button>
+        <button class="btn" id="map-add-obj" onclick="armMap('obj')">➕ Obiekt</button>
+      </span>
+    </div>
+    <div class="map-toolbar" id="map-sel-row" style="display:none">
+      <button class="btn" onclick="editMapSel()">✏️ Zmień</button>
+      <button class="btn red" onclick="delMapSel()">🗑️ Usuń</button>
+      <button class="btn ghost" onclick="mapSel=null;renderMapTab()">Odznacz</button>
+    </div>
+    <svg id="map-svg" viewBox="0 0 100 70" preserveAspectRatio="xMidYMid meet"></svg>
+    <p class="muted small" id="map-hint"></p>
   </section>
 
   <!-- ============ W TERENIE ============ -->
@@ -241,6 +280,7 @@
 <!-- dolna nawigacja -->
 <nav class="bottom">
   <button data-tab="items" class="active" onclick="showTab('items')"><span class="ico">📦</span>Sprzęt</button>
+  <button data-tab="map" onclick="showTab('map')"><span class="ico">🗺️</span>Mapa</button>
   <button data-tab="out" onclick="showTab('out')" style="position:relative"><span class="ico">🚚</span>W terenie<span class="badge" id="out-badge"></span></button>
   <button data-tab="log" onclick="showTab('log')"><span class="ico">🕓</span>Historia</button>
   <button data-tab="set" onclick="showTab('set')"><span class="ico">⚙️</span>Ustawienia</button>
@@ -276,6 +316,7 @@
     </div>
     <p class="muted small" id="take-avail"></p>
   </div>
+  <div class="mini-map" id="take-map"></div>
   <div class="dlg-acts">
     <button class="btn ghost" onclick="closeDlg('dlg-take')">Anuluj</button>
     <button class="btn acc" onclick="confirmTakeQty()">OK</button>
@@ -286,6 +327,8 @@
 <dialog id="dlg-cart">
   <h3>🚚 Zabierasz z magazynu</h3>
   <div id="cart-list"></div>
+  <p class="muted small" style="margin:8px 0 0">Gdzie to leży:</p>
+  <div class="mini-map" id="cart-map"></div>
   <div class="frow"><label>Dokąd / na jaką robotę? (opcjonalnie)</label>
     <input id="cart-dest" type="text" autocomplete="off" placeholder="np. montaż Kraków, ul. Lea"></div>
   <div class="frow"><label>Kto bierze</label><input id="cart-who" type="text" autocomplete="off"></div>
@@ -305,10 +348,22 @@
       <input id="ret-qty" type="number" min="1" value="1" inputmode="numeric">
       <button class="qbtn" onclick="bumpQty('ret-qty',1)">+</button>
     </div></div>
-  <div class="frow"><label>Gdzie odkładasz?</label><select id="ret-loc"></select></div>
+  <div class="frow"><label>Gdzie odkładasz?</label>
+    <select id="ret-loc" onchange="updateRetMap()"></select></div>
+  <div class="mini-map" id="ret-map"></div>
   <div class="dlg-acts">
     <button class="btn ghost" onclick="closeDlg('dlg-return')">Anuluj</button>
     <button class="btn grn" onclick="confirmReturn()">✅ Zwracam</button>
+  </div>
+</dialog>
+
+<!-- dialog: przypisanie magazynu do elementu mapy -->
+<dialog id="dlg-maploc">
+  <h3>Który magazyn to jest?</h3>
+  <div class="frow"><select id="maploc-sel"></select></div>
+  <div class="dlg-acts">
+    <button class="btn ghost" onclick="pendingRect=null;closeDlg('dlg-maploc')">Anuluj</button>
+    <button class="btn acc" onclick="confirmMapLoc()">OK</button>
   </div>
 </dialog>
 
@@ -316,7 +371,7 @@
 
 <script>
 "use strict";
-const APP_VER = "1.0.0";
+const APP_VER = "1.1.0";
 const LS = {
   data: "mg_data", name: "mg_name", token: "mg_token", gist: "mg_gist",
   dirty: "mg_dirty", lastSync: "mg_last_sync"
@@ -330,21 +385,69 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 // ---------- model danych ----------
 // data = { v, items:{id:{id,name,loc,qty,note,u,del}},
 //          loans:{id:{id,itemId,who,n,dest,ts,retAt,retBy,u}},
-//          locs:{id:{id,name,u,del}} }
+//          locs:{id:{id,name,u,del}},
+//          map:{id:{id,kind:'wall'|'loc'|'obj',x,y,w,h,locId,label,u,del}} }
+// Dane startowe mają STAŁE ID + u:1, żeby nie duplikowały się między urządzeniami,
+// a wersja z chmury (nowsze u, w tym tombstony) zawsze wygrywała.
 let data = loadLocal();
-function blankData(){
-  // stałe ID + u:1, żeby domyślne miejsca nie duplikowały się między urządzeniami,
-  // a wersja z chmury (nowsze u) zawsze wygrywała
-  const d = { v: 1, items: {}, loans: {}, locs: {} };
+function defaultLocs(){
+  const o = {};
   [["loc-a", "Szafka A"], ["loc-b", "Szafka B"], ["loc-c", "Magazyn z tyłu"]].forEach(([id, name]) => {
-    d.locs[id] = { id, name, u: 1, del: 0 };
+    o[id] = { id, name, u: 1, del: 0 };
   });
-  return d;
+  return o;
+}
+function defaultItems(){
+  const o = {};
+  [["it-01", "Wiertarka udarowa Makita HP2071", "loc-a", 1, "nr ser. 4471820"],
+   ["it-02", "Wkrętarka aku Bosch GSR 18V", "loc-a", 2, "2 baterie + ładowarka"],
+   ["it-03", "Poziomica laserowa Bosch GLL 3-80", "loc-a", 1, ""],
+   ["it-04", "Dalmierz laserowy Leica D2", "loc-a", 1, ""],
+   ["it-05", "Miernik elektryczny Fluke 117", "loc-a", 1, ""],
+   ["it-06", "Szlifierka kątowa 125 mm DeWalt", "loc-b", 1, ""],
+   ["it-07", "Walizka kluczy nasadowych 108 el.", "loc-b", 1, ""],
+   ["it-08", "Zestaw wierteł SDS-Plus", "loc-b", 1, "5–16 mm"],
+   ["it-09", "Młot udarowy SDS-Max Hilti", "loc-c", 1, "z dłutami"],
+   ["it-10", "Drabina aluminiowa 3 m", "loc-c", 2, ""],
+   ["it-11", "Przedłużacz bębnowy 25 m", "loc-c", 3, ""],
+   ["it-12", "Odkurzacz przemysłowy Kärcher WD6", "loc-c", 1, "worki w szufladzie"]
+  ].forEach(([id, name, loc, qty, note]) => {
+    o[id] = { id, name, loc, qty, note, u: 1, del: 0, by: "" };
+  });
+  return o;
+}
+function defaultMapEls(){
+  const o = {};
+  [["map-w-top", "wall", 0, 0, 100, 2],
+   ["map-w-left", "wall", 0, 2, 2, 66],
+   ["map-w-right", "wall", 98, 2, 2, 66],
+   ["map-w-bot1", "wall", 0, 68, 70, 2],
+   ["map-w-bot2", "wall", 82, 68, 18, 2],
+   ["map-loc-c", "loc", 30, 4, 40, 12, null, "loc-c"],
+   ["map-loc-a", "loc", 4, 14, 12, 26, null, "loc-a"],
+   ["map-loc-b", "loc", 84, 14, 12, 26, null, "loc-b"],
+   ["map-obj-stol", "obj", 32, 38, 30, 12, "Stół warsztatowy"],
+   ["map-obj-drzwi", "obj", 70, 64, 12, 4, "Wejście"]
+  ].forEach(([id, kind, x, y, w, h, label, locId]) => {
+    o[id] = { id, kind, x, y, w, h, label: label || "", locId: locId || "", u: 1, del: 0 };
+  });
+  return o;
+}
+function blankData(){
+  return { v: 1, items: defaultItems(), loans: {}, locs: defaultLocs(), map: defaultMapEls() };
 }
 function loadLocal(){
   try {
     const raw = localStorage.getItem(LS.data);
-    if (raw) { const d = JSON.parse(raw); if (d && d.items && d.locs) return d; }
+    if (raw) {
+      const d = JSON.parse(raw);
+      if (d && d.items && d.locs) {
+        // migracja ze starszej wersji danych
+        if (!d.map || !Object.keys(d.map).length) d.map = defaultMapEls();
+        if (!Object.keys(d.items).length && !Object.keys(d.loans || {}).length) d.items = defaultItems();
+        return d;
+      }
+    }
   } catch (e) {}
   return blankData();
 }
@@ -369,7 +472,8 @@ function mergeData(local, remote){
     v: 1,
     items: mergeColl(local.items, remote.items),
     loans: mergeColl(local.loans, remote.loans),
-    locs:  mergeColl(local.locs,  remote.locs)
+    locs:  mergeColl(local.locs,  remote.locs),
+    map:   mergeColl(local.map || {}, remote.map || {})
   };
 }
 function pruneOld(d){
@@ -381,6 +485,10 @@ function pruneOld(d){
   for (const id in d.items) {
     const it = d.items[id];
     if (it.del && it.u < cutoff) delete d.items[id];
+  }
+  for (const id in d.map) {
+    const e = d.map[id];
+    if (e.del && e.u < cutoff) delete d.map[id];
   }
 }
 
@@ -483,7 +591,7 @@ function renderItems(){
     return `<div class="item ${inCart ? "sel" : ""}">
       <div class="row1"><span class="name">${esc(it.name)}</span>
         ${qty > 1 ? `<span class="pill">${avail}/${qty} szt.</span>` : ""}</div>
-      <div class="row2"><span class="pill loc">📍 ${esc(locName(it.loc))}</span>${stPill}</div>
+      <div class="row2"><span class="pill loc" style="cursor:pointer" onclick="showOnMap('${it.loc}')">📍 ${esc(locName(it.loc))}</span>${stPill}</div>
       ${it.note ? `<div class="note">${esc(it.note)}</div>` : ""}
       <div class="acts">
         ${avail > 0 ? (inCart
@@ -546,6 +654,7 @@ function takeItem(id){
   inp.value = 1; inp.dataset.max = avail;
   document.getElementById("dlg-take-title").textContent = it.name;
   document.getElementById("take-avail").textContent = `Dostępne: ${avail} szt.`;
+  document.getElementById("take-map").innerHTML = miniMap([it.loc]);
   document.getElementById("dlg-take").showModal();
 }
 function confirmTakeQty(){
@@ -572,6 +681,8 @@ function openCartDlg(){
       <button class="btn ghost" onclick="rmCartByItem('${c.itemId}');openCartDlg()">✕</button></div>`;
   }).join("") || "<p class='muted'>pusto</p>";
   if (!cart.length) { closeDlg("dlg-cart"); return; }
+  document.getElementById("cart-map").innerHTML =
+    miniMap([...new Set(cart.map(c => (data.items[c.itemId] || {}).loc).filter(Boolean))]);
   document.getElementById("cart-who").value = cfg().name;
   if (!document.getElementById("dlg-cart").open) document.getElementById("dlg-cart").showModal();
 }
@@ -610,6 +721,7 @@ function openReturnLoan(loanId){
   if ((l.n || 1) > 1) { qr.style.display = ""; inp.value = l.n; inp.dataset.max = l.n; }
   else { qr.style.display = "none"; inp.value = 1; inp.dataset.max = 1; }
   fillLocSelect(document.getElementById("ret-loc"), it.loc);
+  updateRetMap();
   document.getElementById("dlg-return").showModal();
 }
 function confirmReturn(){
@@ -801,9 +913,186 @@ function shareSetup(){
   else { navigator.clipboard.writeText(txt); toast("Skopiowano link do schowka 📋"); }
 }
 
+// ---------- mapa warsztatu ----------
+const MAPW = 100, MAPH = 70, SNAP = 1;
+let mapEdit = false, mapArm = null, mapSel = null, mapHl = [], mapHlTimer = null;
+let mapDrag = null, pendingRect = null;
+const activeMapEls = () => Object.values(data.map || {}).filter(e => !e.del);
+const snapV = v => Math.round(v / SNAP) * SNAP;
+function svgPt(svg, ev){
+  const r = svg.getBoundingClientRect();
+  return { x: (ev.clientX - r.left) / r.width * MAPW, y: (ev.clientY - r.top) / r.height * MAPH };
+}
+function melLabel(e){ return e.kind === "loc" ? locName(e.locId) : (e.label || ""); }
+function mapSVG(els, hlLocIds, sel, editable){
+  const order = { wall: 0, obj: 1, loc: 2 };
+  const sorted = [...els].sort((a, b) => order[a.kind] - order[b.kind]);
+  let s = "";
+  for (let g = 10; g < MAPW; g += 10) s += `<line class="map-grid" x1="${g}" y1="0" x2="${g}" y2="${MAPH}"/>`;
+  for (let g = 10; g < MAPH; g += 10) s += `<line class="map-grid" x1="0" y1="${g}" x2="${MAPW}" y2="${g}"/>`;
+  sorted.forEach(e => {
+    const hl = e.kind === "loc" && hlLocIds.includes(e.locId);
+    s += `<rect data-id="${e.id}" x="${e.x}" y="${e.y}" width="${e.w}" height="${e.h}" rx="1"
+      class="mel mel-${e.kind}${hl ? " hl" : ""}${sel === e.id ? " sel" : ""}"/>`;
+    const lbl = melLabel(e);
+    if (lbl && Math.max(e.w, e.h) >= 8 && Math.min(e.w, e.h) >= 4) {
+      const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
+      const rot = e.h > e.w * 1.4 ? ` transform="rotate(-90 ${cx} ${cy})"` : "";
+      s += `<text class="mel-lbl" x="${cx}" y="${cy}"${rot}>${esc(lbl)}</text>`;
+    }
+  });
+  if (mapDrag && mapDrag.type === "draw" && mapDrag.cur) {
+    const c = mapDrag.cur;
+    s += `<rect class="mel prev" x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" rx="1"/>`;
+  }
+  if (sel && editable) {
+    const e = els.find(el => el.id === sel);
+    if (e) s += `<rect class="handle" data-handle="1" x="${e.x + e.w - 2.2}" y="${e.y + e.h - 2.2}" width="4.4" height="4.4" rx="1"/>`;
+  }
+  return s;
+}
+function miniMap(hlLocIds){
+  return `<svg viewBox="0 0 ${MAPW} ${MAPH}" preserveAspectRatio="xMidYMid meet">` +
+    mapSVG(activeMapEls(), hlLocIds || [], null, false) + `</svg>`;
+}
+function renderMapTab(){
+  const svg = document.getElementById("map-svg");
+  if (!svg) return;
+  svg.innerHTML = mapSVG(activeMapEls(), mapHl, mapEdit ? mapSel : null, mapEdit);
+  document.getElementById("map-edit-btn").classList.toggle("on", mapEdit);
+  document.getElementById("map-add-row").style.display = mapEdit ? "inline-flex" : "none";
+  ["wall", "loc", "obj"].forEach(k =>
+    document.getElementById("map-add-" + k).classList.toggle("on", mapArm === k));
+  document.getElementById("map-sel-row").style.display = (mapEdit && mapSel) ? "flex" : "none";
+  document.getElementById("map-hint").textContent =
+    !mapEdit ? "Stuknij magazyn na mapie, żeby zobaczyć jego sprzęt. „Edytuj mapę” — układ ścian i szafek." :
+    mapArm ? "Przeciągnij palcem po mapie, żeby narysować element." :
+    mapSel ? "Przeciągnij element, by go przesunąć; pomarańczowy narożnik zmienia rozmiar." :
+    "Wybierz ➕ co dodać, albo stuknij element, żeby go przesunąć / zmienić / usunąć.";
+}
+function toggleMapEdit(){ mapEdit = !mapEdit; mapArm = null; mapSel = null; mapHl = []; renderMapTab(); }
+function armMap(k){ mapArm = mapArm === k ? null : k; mapSel = null; renderMapTab(); }
+function showOnMap(locId){
+  if (!activeMapEls().some(e => e.kind === "loc" && e.locId === locId)) {
+    showTab("map"); toast("Tego miejsca nie ma jeszcze na mapie — dodaj je w „Edytuj mapę”"); return;
+  }
+  mapEdit = false; mapArm = null; mapSel = null; mapHl = [locId];
+  showTab("map"); renderMapTab();
+  clearTimeout(mapHlTimer);
+  mapHlTimer = setTimeout(() => { mapHl = []; renderMapTab(); }, 8000);
+}
+function editMapSel(){
+  const e = data.map[mapSel]; if (!e) return;
+  if (e.kind === "wall") { toast("Ściana nie ma nazwy — możesz ją przesunąć albo usunąć"); return; }
+  if (e.kind === "loc") { openMapLocDlg(null); return; }
+  const l = prompt("Podpis obiektu:", e.label || "");
+  if (l !== null) { e.label = l.trim(); e.u = now(); persist(); }
+}
+function delMapSel(){
+  const e = data.map[mapSel]; if (!e) return;
+  e.del = 1; e.u = now(); mapSel = null; persist();
+}
+function openMapLocDlg(rect){
+  pendingRect = rect;
+  const sel = document.getElementById("maploc-sel");
+  const cur = !rect && mapSel && data.map[mapSel] ? data.map[mapSel].locId : "";
+  fillLocSelect(sel, cur || (activeLocs()[0] || {}).id);
+  document.getElementById("dlg-maploc").showModal();
+}
+function confirmMapLoc(){
+  const locId = document.getElementById("maploc-sel").value;
+  if (pendingRect) {
+    const id = uid();
+    data.map[id] = { id, kind: "loc", ...pendingRect, label: "", locId, u: now(), del: 0 };
+    pendingRect = null; mapSel = id;
+  } else if (mapSel && data.map[mapSel]) {
+    data.map[mapSel].locId = locId; data.map[mapSel].u = now();
+  }
+  closeDlg("dlg-maploc"); persist();
+}
+function initMapEvents(){
+  const svg = document.getElementById("map-svg");
+  svg.addEventListener("pointerdown", ev => {
+    ev.preventDefault();
+    const p = svgPt(svg, ev), t = ev.target;
+    if (mapEdit && t.dataset && t.dataset.handle) {
+      mapDrag = { type: "resize", id: mapSel };
+      svg.setPointerCapture(ev.pointerId); return;
+    }
+    const id = t.dataset ? t.dataset.id : null;
+    if (mapEdit && mapArm) {
+      mapDrag = { type: "draw", sx: snapV(p.x), sy: snapV(p.y), cur: null };
+      svg.setPointerCapture(ev.pointerId); return;
+    }
+    if (mapEdit && id) {
+      mapSel = id;
+      const e = data.map[id];
+      mapDrag = { type: "move", id, dx: p.x - e.x, dy: p.y - e.y, moved: false };
+      svg.setPointerCapture(ev.pointerId); renderMapTab(); return;
+    }
+    if (mapEdit) { mapSel = null; renderMapTab(); return; }
+    if (id) { // podgląd: stuknięcie magazynu filtruje listę sprzętu
+      const e = data.map[id];
+      if (e && e.kind === "loc" && e.locId) {
+        fltLoc = e.locId; fltSt = "all"; showTab("items"); renderItems();
+        toast("📦 " + locName(e.locId));
+      }
+    }
+  });
+  svg.addEventListener("pointermove", ev => {
+    if (!mapDrag) return;
+    const p = svgPt(svg, ev);
+    if (mapDrag.type === "draw") {
+      const x = Math.min(mapDrag.sx, snapV(p.x)), y = Math.min(mapDrag.sy, snapV(p.y));
+      mapDrag.cur = { x: Math.max(0, x), y: Math.max(0, y),
+        w: Math.min(MAPW, Math.abs(snapV(p.x) - mapDrag.sx)), h: Math.min(MAPH, Math.abs(snapV(p.y) - mapDrag.sy)) };
+      renderMapTab();
+    } else if (mapDrag.type === "move") {
+      const e = data.map[mapDrag.id]; if (!e) return;
+      e.x = Math.max(0, Math.min(MAPW - e.w, snapV(p.x - mapDrag.dx)));
+      e.y = Math.max(0, Math.min(MAPH - e.h, snapV(p.y - mapDrag.dy)));
+      mapDrag.moved = true; renderMapTab();
+    } else if (mapDrag.type === "resize") {
+      const e = data.map[mapDrag.id]; if (!e) return;
+      e.w = Math.max(2, Math.min(MAPW - e.x, snapV(p.x - e.x)));
+      e.h = Math.max(2, Math.min(MAPH - e.y, snapV(p.y - e.y)));
+      renderMapTab();
+    }
+  });
+  const finish = ev => {
+    if (!mapDrag) return;
+    const d = mapDrag; mapDrag = null;
+    if (d.type === "draw") {
+      mapArm && (d.cur && d.cur.w >= 2 && d.cur.h >= 2 ? (() => {
+        if (mapArm === "loc") { openMapLocDlg(d.cur); }
+        else {
+          const id = uid();
+          const label = mapArm === "obj" ? (prompt("Podpis obiektu (np. Stół, Regał):", "") || "").trim() : "";
+          data.map[id] = { id, kind: mapArm, ...d.cur, label, locId: "", u: now(), del: 0 };
+          mapSel = id; persist();
+        }
+        mapArm = null;
+      })() : toast("Za mały element — przeciągnij palcem większy prostokąt"));
+      renderMapTab();
+    } else if (d.type === "move") {
+      const e = data.map[d.id];
+      if (e && d.moved) { e.u = now(); persist(); } else renderMapTab();
+    } else if (d.type === "resize") {
+      const e = data.map[d.id];
+      if (e) { e.u = now(); persist(); }
+    }
+  };
+  svg.addEventListener("pointerup", finish);
+  svg.addEventListener("pointercancel", finish);
+}
+function updateRetMap(){
+  const el = document.getElementById("ret-map");
+  el.innerHTML = miniMap([document.getElementById("ret-loc").value]);
+}
+
 // ---------- start ----------
 function renderAll(){
-  renderWho(); renderItems(); renderOut(); renderLog(); renderLocs(); renderCartbar();
+  renderWho(); renderItems(); renderOut(); renderLog(); renderLocs(); renderCartbar(); renderMapTab();
 }
 (function init(){
   document.getElementById("app-ver").textContent = APP_VER;
@@ -818,6 +1107,7 @@ function renderAll(){
   const c = cfg();
   document.getElementById("set-token").value = c.token;
   document.getElementById("set-gist").value = c.gist;
+  initMapEvents();
   renderAll();
   if (!c.name && !m) askName();
   if (c.token) syncNow(true);

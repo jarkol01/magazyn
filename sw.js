@@ -1,5 +1,5 @@
 // Service worker: cache-first dla plików aplikacji, sieć dla API GitHuba.
-const CACHE = "magazyn-v1";
+const CACHE = "magazyn-v2";
 const ASSETS = ["./", "index.html", "site.webmanifest",
   "icon-192.png", "icon-512.png", "apple-touch-icon.png", "favicon-32.png"];
 
