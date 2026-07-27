@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Magazyn — inwentarz sprzętu</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="theme-color" content="#101418">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Magazyn">
+<style>
+  :root{
+    --bg:#101418; --panel:#1a2027; --panel2:#232b34; --line:#2e3947;
+    --txt:#e8eef4; --mut:#93a3b5; --acc:#f0a532; --acc-dk:#20170a;
+    --ok:#3fb950; --ok-bg:#11301c; --bad:#f85149; --bad-bg:#38181a;
+    --blue:#58a6ff; --blue-bg:#152238; --chip:#2c3947;
+    --nav-h:60px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html{height:100%}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    line-height:1.45;font-size:15.5px;
+    padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));}
+  .wrap{max-width:720px;margin:0 auto;padding:10px 14px 20px}
+  h1{font-size:19px;margin:0;flex:1;display:flex;align-items:center;gap:8px}
+  h2{font-size:16px;margin:18px 0 8px;color:var(--mut);text-transform:uppercase;
+     letter-spacing:.05em;font-weight:700}
+  header.top{display:flex;align-items:center;gap:10px;padding:12px 0 8px;
+    padding-top:calc(12px + env(safe-area-inset-top))}
+  .muted{color:var(--mut)}
+  .small{font-size:13px}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--mut);flex:none;transition:background .3s}
+  .dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)} .dot.busy{background:var(--acc);animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.35}}
+  .who-chip{font-size:13px;background:var(--chip);color:var(--txt);padding:4px 12px;
+    border-radius:999px;border:1px solid var(--line);max-width:40vw;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+
+  /* --- dolna nawigacja --- */
+  nav.bottom{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;
+    background:var(--panel);border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom)}
+  nav.bottom button{flex:1;background:none;border:none;color:var(--mut);cursor:pointer;
+    font-size:11px;font-family:inherit;padding:7px 2px 6px;display:flex;flex-direction:column;
+    align-items:center;gap:2px;height:var(--nav-h)}
+  nav.bottom button .ico{font-size:21px;line-height:1}
+  nav.bottom button.active{color:var(--acc);font-weight:700}
+  nav.bottom button .badge{position:absolute;transform:translate(14px,-4px);
+    background:var(--bad);color:#fff;font-size:10px;font-weight:700;border-radius:999px;
+    min-width:16px;height:16px;line-height:16px;padding:0 4px;display:none}
+
+  section.tab{display:none}
+  section.tab.active{display:block;animation:fade .18s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  /* --- wyszukiwarka i filtry --- */
+  .search-row{display:flex;gap:8px;margin:6px 0 10px}
+  .search-row input{flex:1;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;color:var(--txt);padding:11px 14px;font-size:16px;font-family:inherit}
+  .search-row input:focus{outline:none;border-color:var(--acc)}
+  .chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chips button{flex:none;background:var(--panel);color:var(--mut);border:1px solid var(--line);
+    padding:6px 13px;border-radius:999px;cursor:pointer;font-size:13.5px;font-family:inherit;white-space:nowrap}
+  .chips button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-dk);font-weight:700}
+
+  /* --- karty sprzętu --- */
+  .item{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:12px 14px;margin:8px 0}
+  .item.sel{border-color:var(--acc);background:#221d12}
+  .item .row1{display:flex;align-items:baseline;gap:8px}
+  .item .name{font-weight:700;font-size:16px;flex:1;word-break:break-word}
+  .item .row2{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}
+  .pill{font-size:12px;padding:2px 10px;border-radius:999px;background:var(--chip);
+    color:var(--mut);font-weight:600;white-space:nowrap}
+  .pill.loc{background:var(--blue-bg);color:var(--blue)}
+  .pill.ok{background:var(--ok-bg);color:var(--ok)}
+  .pill.out{background:var(--bad-bg);color:var(--bad)}
+  .pill.part{background:#3a3010;color:var(--acc)}
+  .item .note{color:var(--mut);font-size:13px;margin-top:4px}
+  .item .acts{display:flex;gap:8px;margin-top:10px}
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+    border-radius:10px;padding:9px 14px;font-size:14px;font-family:inherit;cursor:pointer;font-weight:600}
+  .btn:active{transform:scale(.97)}
+  .btn.acc{background:var(--acc);border-color:var(--acc);color:var(--acc-dk)}
+  .btn.grn{background:var(--ok);border-color:var(--ok);color:#08140b}
+  .btn.red{background:var(--bad-bg);border-color:#5c2a2e;color:var(--bad)}
+  .btn.ghost{background:none}
+  .btn.wide{width:100%;padding:13px;font-size:16px}
+  .btn[disabled]{opacity:.45;pointer-events:none}
+
+  /* --- pasek koszyka --- */
+  .cartbar{position:fixed;left:10px;right:10px;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 10px);
+    z-index:41;background:var(--acc);color:var(--acc-dk);border-radius:14px;padding:13px 16px;
+    font-size:16px;font-weight:800;display:none;align-items:center;gap:10px;cursor:pointer;
+    box-shadow:0 6px 24px rgba(0,0,0,.5)}
+  .cartbar .x{margin-left:auto;font-weight:900;padding:0 6px;font-size:18px}
+
+  /* --- osoby w terenie --- */
+  .person{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:10px 0}
+  .person h3{margin:0 0 2px;font-size:16px;display:flex;align-items:center;gap:8px}
+  .person ul{list-style:none;margin:8px 0 0;padding:0}
+  .person li{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line)}
+  .person li .nm{flex:1;word-break:break-word}
+  .person li .ret{flex:none}
+
+  /* --- historia --- */
+  .logline{display:flex;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px}
+  .logline .t{color:var(--mut);flex:none;width:88px;font-size:12.5px;padding-top:2px}
+  .logline .ico{flex:none}
+
+  /* --- formularze / dialogi --- */
+  dialog{background:var(--panel);color:var(--txt);border:1px solid var(--line);
+    border-radius:16px;padding:18px;width:min(480px,calc(100vw - 28px));max-height:85vh;overflow:auto}
+  dialog::backdrop{background:rgba(0,0,0,.6)}
+  dialog h3{margin:0 0 12px;font-size:17px}
+  .frow{margin:10px 0}
+  .frow label{display:block;font-size:13px;color:var(--mut);margin-bottom:4px}
+  .frow input,.frow select,.frow textarea{width:100%;background:var(--panel2);
+    border:1px solid var(--line);border-radius:10px;color:var(--txt);
+    padding:11px 12px;font-size:16px;font-family:inherit}
+  .frow input:focus,.frow select:focus,.frow textarea:focus{outline:none;border-color:var(--acc)}
+  .frow .qtyrow{display:flex;align-items:center;gap:10px}
+  .frow .qtyrow input{width:90px;text-align:center}
+  .qbtn{width:44px;height:44px;font-size:22px;border-radius:10px;background:var(--panel2);
+    border:1px solid var(--line);color:var(--txt);cursor:pointer;flex:none}
+  .dlg-acts{display:flex;gap:10px;margin-top:16px}
+  .dlg-acts .btn{flex:1}
+  .cart-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .cart-item .nm{flex:1;word-break:break-word}
+
+  /* --- ustawienia --- */
+  .setcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0}
+  .setcard h3{margin:0 0 8px;font-size:15px}
+  code{background:var(--panel2);padding:1px 6px;border-radius:6px;font-size:13px}
+  .loc-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line)}
+  .loc-row .nm{flex:1}
+  .empty{color:var(--mut);text-align:center;padding:30px 10px;font-size:14.5px}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 14px);z-index:60;
+    background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+    padding:10px 18px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .25s;
+    pointer-events:none;max-width:90vw;text-align:center}
+  .toast.show{opacity:1}
+  a{color:var(--blue)}
+  ol{padding-left:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>📦 Magazyn</h1>
+    <span class="dot" id="sync-dot" title="Stan synchronizacji"></span>
+    <span class="who-chip" id="who-chip" onclick="askName()">—</span>
+  </header>
+
+  <!-- ============ SPRZĘT ============ -->
+  <section class="tab active" id="tab-items">
+    <div class="search-row">
+      <input id="q" type="search" placeholder="🔍 Szukaj sprzętu…" oninput="renderItems()">
+      <button class="btn acc" onclick="openItemDlg()">➕</button>
+    </div>
+    <div class="chips" id="loc-chips"></div>
+    <div class="chips" id="st-chips"></div>
+    <div id="items-list"></div>
+  </section>
+
+  <!-- ============ W TERENIE ============ -->
+  <section class="tab" id="tab-out">
+    <h2 style="margin-top:6px">Sprzęt poza magazynem</h2>
+    <div id="out-list"></div>
+  </section>
+
+  <!-- ============ HISTORIA ============ -->
+  <section class="tab" id="tab-log">
+    <h2 style="margin-top:6px">Historia ruchów</h2>
+    <div id="log-list"></div>
+  </section>
+
+  <!-- ============ USTAWIENIA ============ -->
+  <section class="tab" id="tab-set">
+    <div class="setcard">
+      <h3>👤 Kim jesteś</h3>
+      <div class="frow"><input id="set-name" type="text" placeholder="Imię (np. Krzysiek)" autocomplete="off"></div>
+      <button class="btn" onclick="saveName()">Zapisz imię</button>
+    </div>
+
+    <div class="setcard">
+      <h3>☁️ Synchronizacja (GitHub Gist)</h3>
+      <div class="frow"><label>Token GitHub (uprawnienie <code>gist</code>)</label>
+        <input id="set-token" type="password" placeholder="ghp_… / github_pat_…" autocomplete="off"></div>
+      <div class="frow"><label>Gist ID <span class="muted small">(pusty = utworzy się przy 1. wysyłce)</span></label>
+        <input id="set-gist" type="text" autocomplete="off"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn acc" onclick="saveSync()">Zapisz</button>
+        <button class="btn" onclick="syncNow()">🔄 Synchronizuj teraz</button>
+        <button class="btn" onclick="shareSetup()">🔗 Link dla współpracownika</button>
+      </div>
+      <p class="muted small" id="sync-status" style="margin-bottom:0">—</p>
+      <details style="margin-top:8px"><summary class="muted small" style="cursor:pointer">Jak zdobyć token?</summary>
+        <ol class="muted small">
+          <li>GitHub → Settings → Developer settings → <b>Personal access tokens → Tokens (classic)</b></li>
+          <li>Generate new token (classic), zaznacz <b>tylko</b> zakres <code>gist</code>, expiration „No expiration”.</li>
+          <li>Skopiuj token i wklej powyżej. Ten sam token wpisują wszyscy pracownicy (raz, na swoim telefonie).</li>
+        </ol>
+      </details>
+    </div>
+
+    <div class="setcard">
+      <h3>🗄️ Magazyny / miejsca</h3>
+      <div id="loc-list"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input id="new-loc" type="text" placeholder="Nowe miejsce…" style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--txt);padding:10px 12px;font-size:15px;font-family:inherit">
+        <button class="btn" onclick="addLocation()">Dodaj</button>
+      </div>
+    </div>
+
+    <div class="setcard">
+      <h3>🧰 Dane</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" onclick="exportCSV()">⬇️ Eksport CSV</button>
+        <button class="btn red" onclick="hardResetLocal()">Wyczyść dane na tym urządzeniu</button>
+      </div>
+      <p class="muted small" style="margin-bottom:0">Wersja aplikacji: <span id="app-ver"></span></p>
+    </div>
+  </section>
+</div>
+
+<!-- pasek koszyka -->
+<div class="cartbar" id="cartbar" onclick="openCartDlg()">
+  <span>🚚</span><span id="cartbar-txt"></span>
+  <span class="x" onclick="event.stopPropagation();clearCart()">✕</span>
+</div>
+
+<!-- dolna nawigacja -->
+<nav class="bottom">
+  <button data-tab="items" class="active" onclick="showTab('items')"><span class="ico">📦</span>Sprzęt</button>
+  <button data-tab="out" onclick="showTab('out')" style="position:relative"><span class="ico">🚚</span>W terenie<span class="badge" id="out-badge"></span></button>
+  <button data-tab="log" onclick="showTab('log')"><span class="ico">🕓</span>Historia</button>
+  <button data-tab="set" onclick="showTab('set')"><span class="ico">⚙️</span>Ustawienia</button>
+</nav>
+
+<!-- dialog: dodaj/edytuj sprzęt -->
+<dialog id="dlg-item">
+  <h3 id="dlg-item-title">Nowy sprzęt</h3>
+  <div class="frow"><label>Nazwa *</label><input id="it-name" type="text" autocomplete="off" placeholder="np. Wiertarka Makita HP457D"></div>
+  <div class="frow"><label>Miejsce (magazyn)</label><select id="it-loc"></select></div>
+  <div class="frow"><label>Ilość (szt.)</label>
+    <div class="qtyrow">
+      <button class="qbtn" onclick="bumpQty('it-qty',-1)">−</button>
+      <input id="it-qty" type="number" min="1" value="1" inputmode="numeric">
+      <button class="qbtn" onclick="bumpQty('it-qty',1)">+</button>
+    </div></div>
+  <div class="frow"><label>Notatka (nr seryjny, stan…)</label><input id="it-note" type="text" autocomplete="off"></div>
+  <div class="dlg-acts">
+    <button class="btn red" id="it-del" onclick="deleteItemFromDlg()" style="display:none">Usuń</button>
+    <button class="btn ghost" onclick="closeDlg('dlg-item')">Anuluj</button>
+    <button class="btn acc" onclick="saveItemDlg()">Zapisz</button>
+  </div>
+</dialog>
+
+<!-- dialog: ile sztuk bierzesz -->
+<dialog id="dlg-take">
+  <h3 id="dlg-take-title">Ile sztuk bierzesz?</h3>
+  <div class="frow">
+    <div class="qtyrow">
+      <button class="qbtn" onclick="bumpQty('take-qty',-1)">−</button>
+      <input id="take-qty" type="number" min="1" value="1" inputmode="numeric">
+      <button class="qbtn" onclick="bumpQty('take-qty',1)">+</button>
+    </div>
+    <p class="muted small" id="take-avail"></p>
+  </div>
+  <div class="dlg-acts">
+    <button class="btn ghost" onclick="closeDlg('dlg-take')">Anuluj</button>
+    <button class="btn acc" onclick="confirmTakeQty()">OK</button>
+  </div>
+</dialog>
+
+<!-- dialog: potwierdzenie zabrania (koszyk) -->
+<dialog id="dlg-cart">
+  <h3>🚚 Zabierasz z magazynu</h3>
+  <div id="cart-list"></div>
+  <div class="frow"><label>Dokąd / na jaką robotę? (opcjonalnie)</label>
+    <input id="cart-dest" type="text" autocomplete="off" placeholder="np. montaż Kraków, ul. Lea"></div>
+  <div class="frow"><label>Kto bierze</label><input id="cart-who" type="text" autocomplete="off"></div>
+  <div class="dlg-acts">
+    <button class="btn ghost" onclick="closeDlg('dlg-cart')">Anuluj</button>
+    <button class="btn grn" onclick="confirmCart()">✅ Zabieram</button>
+  </div>
+</dialog>
+
+<!-- dialog: zwrot -->
+<dialog id="dlg-return">
+  <h3>↩️ Zwrot do magazynu</h3>
+  <p id="ret-desc" class="muted small"></p>
+  <div class="frow" id="ret-qty-row"><label>Ile sztuk oddajesz?</label>
+    <div class="qtyrow">
+      <button class="qbtn" onclick="bumpQty('ret-qty',-1)">−</button>
+      <input id="ret-qty" type="number" min="1" value="1" inputmode="numeric">
+      <button class="qbtn" onclick="bumpQty('ret-qty',1)">+</button>
+    </div></div>
+  <div class="frow"><label>Gdzie odkładasz?</label><select id="ret-loc"></select></div>
+  <div class="dlg-acts">
+    <button class="btn ghost" onclick="closeDlg('dlg-return')">Anuluj</button>
+    <button class="btn grn" onclick="confirmReturn()">✅ Zwracam</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const APP_VER = "1.0.0";
+const LS = {
+  data: "mg_data", name: "mg_name", token: "mg_token", gist: "mg_gist",
+  dirty: "mg_dirty", lastSync: "mg_last_sync"
+};
+const GIST_FILE = "magazyn.json";
+const GIST_DESC = "Magazyn — dane inwentarza (aplikacja jarkol01.github.io/magazyn)";
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const now = () => Date.now();
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+// ---------- model danych ----------
+// data = { v, items:{id:{id,name,loc,qty,note,u,del}},
+//          loans:{id:{id,itemId,who,n,dest,ts,retAt,retBy,u}},
+//          locs:{id:{id,name,u,del}} }
+let data = loadLocal();
+function blankData(){
+  // stałe ID + u:1, żeby domyślne miejsca nie duplikowały się między urządzeniami,
+  // a wersja z chmury (nowsze u) zawsze wygrywała
+  const d = { v: 1, items: {}, loans: {}, locs: {} };
+  [["loc-a", "Szafka A"], ["loc-b", "Szafka B"], ["loc-c", "Magazyn z tyłu"]].forEach(([id, name]) => {
+    d.locs[id] = { id, name, u: 1, del: 0 };
+  });
+  return d;
+}
+function loadLocal(){
+  try {
+    const raw = localStorage.getItem(LS.data);
+    if (raw) { const d = JSON.parse(raw); if (d && d.items && d.locs) return d; }
+  } catch (e) {}
+  return blankData();
+}
+function persist(){
+  localStorage.setItem(LS.data, JSON.stringify(data));
+  localStorage.setItem(LS.dirty, "1");
+  renderAll();
+  schedulePush();
+}
+
+// ---------- scalanie (merge) ----------
+function mergeColl(a, b){
+  const out = { ...a };
+  for (const id in b) {
+    if (!out[id] || (b[id].u || 0) > (out[id].u || 0)) out[id] = b[id];
+  }
+  return out;
+}
+function mergeData(local, remote){
+  if (!remote || !remote.items) return local;
+  return {
+    v: 1,
+    items: mergeColl(local.items, remote.items),
+    loans: mergeColl(local.loans, remote.loans),
+    locs:  mergeColl(local.locs,  remote.locs)
+  };
+}
+function pruneOld(d){
+  const cutoff = now() - 180 * 24 * 3600e3; // zwroty starsze niż pół roku
+  for (const id in d.loans) {
+    const l = d.loans[id];
+    if (l.retAt && l.retAt < cutoff) delete d.loans[id];
+  }
+  for (const id in d.items) {
+    const it = d.items[id];
+    if (it.del && it.u < cutoff) delete d.items[id];
+  }
+}
+
+// ---------- pomocnicze ----------
+const cfg = () => ({
+  name: (localStorage.getItem(LS.name) || "").trim(),
+  token: (localStorage.getItem(LS.token) || "").trim(),
+  gist: (localStorage.getItem(LS.gist) || "").trim()
+});
+const locName = id => (data.locs[id] && !data.locs[id].del) ? data.locs[id].name : "?";
+const activeLocs = () => Object.values(data.locs).filter(l => !l.del)
+  .sort((a, b) => a.name.localeCompare(b.name, "pl"));
+const activeItems = () => Object.values(data.items).filter(i => !i.del);
+const itemLoans = itemId => Object.values(data.loans).filter(l => l.itemId === itemId && !l.retAt);
+const outCount = it => itemLoans(it.id).reduce((s, l) => s + (l.n || 1), 0);
+const availCount = it => Math.max(0, (it.qty || 1) - outCount(it));
+function fmtTs(ts){
+  const d = new Date(ts);
+  const dd = String(d.getDate()).padStart(2, "0"), mm = String(d.getMonth() + 1).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0"), mi = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}.${mm} ${hh}:${mi}`;
+}
+let toastTimer;
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+function closeDlg(id){ document.getElementById(id).close(); }
+function bumpQty(inputId, d){
+  const el = document.getElementById(inputId);
+  const max = el.dataset.max ? Number(el.dataset.max) : Infinity;
+  el.value = Math.min(max, Math.max(1, (Number(el.value) || 1) + d));
+}
+
+// ---------- imię ----------
+function askName(){
+  const cur = cfg().name;
+  const n = prompt("Twoje imię (będzie widoczne przy braniu sprzętu):", cur);
+  if (n !== null && n.trim()) { localStorage.setItem(LS.name, n.trim()); renderWho(); }
+}
+function saveName(){
+  const n = document.getElementById("set-name").value.trim();
+  if (!n) { toast("Podaj imię"); return; }
+  localStorage.setItem(LS.name, n); renderWho(); toast("Zapisano imię ✅");
+}
+function renderWho(){
+  const n = cfg().name;
+  document.getElementById("who-chip").textContent = n ? `👤 ${n}` : "👤 kto?";
+  document.getElementById("set-name").value = n;
+}
+function requireName(){
+  if (cfg().name) return true;
+  askName();
+  return !!cfg().name;
+}
+
+// ---------- zakładki ----------
+function showTab(name){
+  document.querySelectorAll("section.tab").forEach(s => s.classList.toggle("active", s.id === "tab-" + name));
+  document.querySelectorAll("nav.bottom button").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+  window.scrollTo(0, 0);
+}
+
+// ---------- filtry + lista sprzętu ----------
+let fltLoc = "all", fltSt = "all";
+function renderChips(){
+  const lc = document.getElementById("loc-chips");
+  lc.innerHTML = `<button class="${fltLoc === "all" ? "on" : ""}" onclick="fltLoc='all';renderItems()">Wszystkie</button>` +
+    activeLocs().map(l =>
+      `<button class="${fltLoc === l.id ? "on" : ""}" onclick="fltLoc='${l.id}';renderItems()">${esc(l.name)}</button>`).join("") +
+    `<button class="${fltLoc === "out" ? "on" : ""}" onclick="fltLoc='out';renderItems()">🚚 W terenie</button>`;
+  document.getElementById("st-chips").innerHTML =
+    [["all", "Wszystko"], ["avail", "✅ Dostępne"], ["out", "🚚 Wzięte"]].map(([v, t]) =>
+      `<button class="${fltSt === v ? "on" : ""}" onclick="fltSt='${v}';renderItems()">${t}</button>`).join("");
+}
+function renderItems(){
+  renderChips();
+  const q = document.getElementById("q").value.trim().toLowerCase();
+  let list = activeItems();
+  if (q) list = list.filter(i => (i.name + " " + (i.note || "") + " " + locName(i.loc)).toLowerCase().includes(q));
+  if (fltLoc === "out") list = list.filter(i => outCount(i) > 0);
+  else if (fltLoc !== "all") list = list.filter(i => i.loc === fltLoc);
+  if (fltSt === "avail") list = list.filter(i => availCount(i) > 0);
+  if (fltSt === "out") list = list.filter(i => outCount(i) > 0);
+  list.sort((a, b) => a.name.localeCompare(b.name, "pl"));
+  const el = document.getElementById("items-list");
+  if (!list.length) {
+    el.innerHTML = `<div class="empty">${activeItems().length ? "Nic nie pasuje do filtrów 🤷" :
+      "Pusto! Dodaj pierwszy sprzęt przyciskiem ➕ u góry."}</div>`;
+    return;
+  }
+  el.innerHTML = list.map(it => {
+    const out = outCount(it), avail = availCount(it), qty = it.qty || 1;
+    const inCart = cart.some(c => c.itemId === it.id);
+    let stPill;
+    if (out === 0) stPill = `<span class="pill ok">✅ na miejscu</span>`;
+    else if (avail === 0) stPill = `<span class="pill out">🚚 ${itemLoans(it.id).map(l => esc(l.who)).join(", ")}</span>`;
+    else stPill = `<span class="pill part">🚚 ${out}/${qty} wzięte</span>`;
+    return `<div class="item ${inCart ? "sel" : ""}">
+      <div class="row1"><span class="name">${esc(it.name)}</span>
+        ${qty > 1 ? `<span class="pill">${avail}/${qty} szt.</span>` : ""}</div>
+      <div class="row2"><span class="pill loc">📍 ${esc(locName(it.loc))}</span>${stPill}</div>
+      ${it.note ? `<div class="note">${esc(it.note)}</div>` : ""}
+      <div class="acts">
+        ${avail > 0 ? (inCart
+          ? `<button class="btn" onclick="rmCartByItem('${it.id}')">✓ w koszyku — usuń</button>`
+          : `<button class="btn acc" onclick="takeItem('${it.id}')">🚚 Biorę</button>`) : ""}
+        ${out > 0 ? `<button class="btn grn" onclick="openReturn('${it.id}')">↩️ Zwrot</button>` : ""}
+        <button class="btn ghost" style="margin-left:auto" onclick="openItemDlg('${it.id}')">✏️</button>
+      </div></div>`;
+  }).join("");
+}
+// ---------- dodawanie / edycja sprzętu ----------
+let editItemId = null;
+function fillLocSelect(sel, chosen){
+  sel.innerHTML = activeLocs().map(l =>
+    `<option value="${l.id}" ${l.id === chosen ? "selected" : ""}>${esc(l.name)}</option>`).join("");
+}
+function openItemDlg(id){
+  editItemId = id || null;
+  const it = id ? data.items[id] : null;
+  document.getElementById("dlg-item-title").textContent = it ? "Edytuj sprzęt" : "Nowy sprzęt";
+  document.getElementById("it-name").value = it ? it.name : "";
+  document.getElementById("it-qty").value = it ? (it.qty || 1) : 1;
+  document.getElementById("it-note").value = it ? (it.note || "") : "";
+  document.getElementById("it-del").style.display = it ? "" : "none";
+  fillLocSelect(document.getElementById("it-loc"), it ? it.loc : (activeLocs()[0] || {}).id);
+  document.getElementById("dlg-item").showModal();
+}
+function saveItemDlg(){
+  const name = document.getElementById("it-name").value.trim();
+  if (!name) { toast("Podaj nazwę"); return; }
+  const qty = Math.max(1, Number(document.getElementById("it-qty").value) || 1);
+  const loc = document.getElementById("it-loc").value;
+  const note = document.getElementById("it-note").value.trim();
+  if (editItemId && data.items[editItemId]) {
+    Object.assign(data.items[editItemId], { name, qty, loc, note, u: now() });
+  } else {
+    const id = uid();
+    data.items[id] = { id, name, qty, loc, note, u: now(), del: 0, by: cfg().name || "?" };
+  }
+  closeDlg("dlg-item"); persist(); toast("Zapisano ✅");
+}
+function deleteItemFromDlg(){
+  if (!editItemId) return;
+  const it = data.items[editItemId];
+  if (!confirm(`Usunąć „${it.name}” z inwentarza?`)) return;
+  it.del = 1; it.u = now();
+  closeDlg("dlg-item"); persist(); toast("Usunięto");
+}
+
+// ---------- koszyk „biorę na wyjazd" ----------
+let cart = []; // [{itemId, n}]
+let takeItemId = null;
+function takeItem(id){
+  const it = data.items[id]; if (!it) return;
+  const avail = availCount(it);
+  if (avail <= 0) return;
+  if ((it.qty || 1) === 1) { cart.push({ itemId: id, n: 1 }); renderAll(); return; }
+  takeItemId = id;
+  const inp = document.getElementById("take-qty");
+  inp.value = 1; inp.dataset.max = avail;
+  document.getElementById("dlg-take-title").textContent = it.name;
+  document.getElementById("take-avail").textContent = `Dostępne: ${avail} szt.`;
+  document.getElementById("dlg-take").showModal();
+}
+function confirmTakeQty(){
+  const it = data.items[takeItemId]; if (!it) return;
+  const n = Math.min(availCount(it), Math.max(1, Number(document.getElementById("take-qty").value) || 1));
+  cart.push({ itemId: takeItemId, n });
+  closeDlg("dlg-take"); renderAll();
+}
+function rmCartByItem(id){ cart = cart.filter(c => c.itemId !== id); renderAll(); }
+function clearCart(){ cart = []; renderAll(); }
+function renderCartbar(){
+  const bar = document.getElementById("cartbar");
+  if (!cart.length) { bar.style.display = "none"; return; }
+  const n = cart.reduce((s, c) => s + c.n, 0);
+  document.getElementById("cartbar-txt").textContent =
+    `Zabieram ${n} ${n === 1 ? "rzecz" : n < 5 ? "rzeczy" : "rzeczy"} — potwierdź`;
+  bar.style.display = "flex";
+}
+function openCartDlg(){
+  if (!cart.length) return;
+  document.getElementById("cart-list").innerHTML = cart.map(c => {
+    const it = data.items[c.itemId];
+    return `<div class="cart-item"><span class="nm">${esc(it.name)}${c.n > 1 ? ` × ${c.n}` : ""}</span>
+      <button class="btn ghost" onclick="rmCartByItem('${c.itemId}');openCartDlg()">✕</button></div>`;
+  }).join("") || "<p class='muted'>pusto</p>";
+  if (!cart.length) { closeDlg("dlg-cart"); return; }
+  document.getElementById("cart-who").value = cfg().name;
+  if (!document.getElementById("dlg-cart").open) document.getElementById("dlg-cart").showModal();
+}
+function confirmCart(){
+  const who = document.getElementById("cart-who").value.trim();
+  if (!who) { toast("Wpisz, kto bierze"); return; }
+  localStorage.setItem(LS.name, who); renderWho();
+  const dest = document.getElementById("cart-dest").value.trim();
+  const ts = now();
+  cart.forEach(c => {
+    const id = uid();
+    data.loans[id] = { id, itemId: c.itemId, who, n: c.n, dest, ts, retAt: 0, retBy: "", u: ts };
+  });
+  cart = [];
+  closeDlg("dlg-cart"); persist();
+  toast(`🚚 Zapisane — ${who} zabiera sprzęt`);
+}
+
+// ---------- zwroty ----------
+let retLoanId = null;
+function openReturn(itemId){
+  const loans = itemLoans(itemId);
+  if (!loans.length) return;
+  // jeśli jedna pozycja — od razu; jeśli kilka osób, wybierz najnowszą swoją albo pierwszą
+  const my = loans.find(l => l.who === cfg().name);
+  openReturnLoan((my || loans[0]).id);
+}
+function openReturnLoan(loanId){
+  const l = data.loans[loanId]; if (!l || l.retAt) return;
+  retLoanId = loanId;
+  const it = data.items[l.itemId];
+  document.getElementById("ret-desc").textContent =
+    `${it.name}${l.n > 1 ? ` (wzięte ${l.n} szt.)` : ""} — ${l.who}, ${fmtTs(l.ts)}${l.dest ? ", " + l.dest : ""}`;
+  const qr = document.getElementById("ret-qty-row");
+  const inp = document.getElementById("ret-qty");
+  if ((l.n || 1) > 1) { qr.style.display = ""; inp.value = l.n; inp.dataset.max = l.n; }
+  else { qr.style.display = "none"; inp.value = 1; inp.dataset.max = 1; }
+  fillLocSelect(document.getElementById("ret-loc"), it.loc);
+  document.getElementById("dlg-return").showModal();
+}
+function confirmReturn(){
+  const l = data.loans[retLoanId]; if (!l) return;
+  const it = data.items[l.itemId];
+  const nRet = Math.min(l.n || 1, Math.max(1, Number(document.getElementById("ret-qty").value) || 1));
+  const newLoc = document.getElementById("ret-loc").value;
+  const ts = now();
+  const by = cfg().name || l.who;
+  if (nRet >= (l.n || 1)) {
+    Object.assign(l, { retAt: ts, retBy: by, retLoc: newLoc, u: ts });
+  } else {
+    // zwrot częściowy: zamknij część, resztę zostaw jako otwartą pożyczkę
+    const restId = uid();
+    data.loans[restId] = { ...l, id: restId, n: (l.n || 1) - nRet, u: ts };
+    Object.assign(l, { n: nRet, retAt: ts, retBy: by, retLoc: newLoc, u: ts });
+  }
+  if (it && newLoc && it.loc !== newLoc) { it.loc = newLoc; it.u = ts; }
+  closeDlg("dlg-return"); persist(); toast("↩️ Zwrócone ✅");
+}
+
+// ---------- widok „w terenie" ----------
+function renderOut(){
+  const open = Object.values(data.loans).filter(l => !l.retAt && data.items[l.itemId] && !data.items[l.itemId].del);
+  const badge = document.getElementById("out-badge");
+  const total = open.length;
+  badge.style.display = total ? "block" : "none";
+  badge.textContent = total;
+  const byWho = {};
+  open.forEach(l => { (byWho[l.who] = byWho[l.who] || []).push(l); });
+  const el = document.getElementById("out-list");
+  const names = Object.keys(byWho).sort((a, b) => a.localeCompare(b, "pl"));
+  if (!names.length) { el.innerHTML = `<div class="empty">Cały sprzęt na miejscu 🎉</div>`; return; }
+  el.innerHTML = names.map(who => {
+    const ls = byWho[who].sort((a, b) => b.ts - a.ts);
+    const dests = [...new Set(ls.map(l => l.dest).filter(Boolean))];
+    return `<div class="person"><h3>👤 ${esc(who)} <span class="pill">${ls.length}</span>
+        ${dests.length ? `<span class="pill loc">📍 ${esc(dests.join(", "))}</span>` : ""}</h3>
+      <ul>${ls.map(l => {
+        const it = data.items[l.itemId];
+        return `<li><span class="nm">${esc(it.name)}${(l.n || 1) > 1 ? ` × ${l.n}` : ""}
+            <span class="muted small">· ${fmtTs(l.ts)}</span></span>
+          <button class="btn grn ret" onclick="openReturnLoan('${l.id}')">↩️ Zwrot</button></li>`;
+      }).join("")}</ul></div>`;
+  }).join("");
+}
+
+// ---------- historia ----------
+function renderLog(){
+  const evs = [];
+  Object.values(data.loans).forEach(l => {
+    const it = data.items[l.itemId]; if (!it) return;
+    evs.push({ ts: l.ts, html: `<b>${esc(l.who)}</b> zabrał(a) <b>${esc(it.name)}</b>${(l.n || 1) > 1 ? ` × ${l.n}` : ""}${l.dest ? ` → ${esc(l.dest)}` : ""}`, ico: "🚚" });
+    if (l.retAt) evs.push({ ts: l.retAt, html: `<b>${esc(l.retBy || l.who)}</b> zwrócił(a) <b>${esc(it.name)}</b>${(l.n || 1) > 1 ? ` × ${l.n}` : ""}${l.retLoc ? ` → ${esc(locName(l.retLoc))}` : ""}`, ico: "↩️" });
+  });
+  evs.sort((a, b) => b.ts - a.ts);
+  const el = document.getElementById("log-list");
+  if (!evs.length) { el.innerHTML = `<div class="empty">Brak historii — jeszcze nikt nic nie brał.</div>`; return; }
+  el.innerHTML = evs.slice(0, 200).map(e =>
+    `<div class="logline"><span class="t">${fmtTs(e.ts)}</span><span class="ico">${e.ico}</span><span>${e.html}</span></div>`).join("");
+}
+
+// ---------- magazyny ----------
+function renderLocs(){
+  const el = document.getElementById("loc-list");
+  el.innerHTML = activeLocs().map(l => {
+    const cnt = activeItems().filter(i => i.loc === l.id).length;
+    return `<div class="loc-row"><span class="nm">📍 ${esc(l.name)} <span class="muted small">(${cnt} poz.)</span></span>
+      <button class="btn ghost" onclick="renameLocation('${l.id}')">✏️</button>
+      <button class="btn ghost" onclick="deleteLocation('${l.id}')">🗑️</button></div>`;
+  }).join("") || "<p class='muted small'>Brak miejsc — dodaj pierwsze.</p>";
+}
+function addLocation(){
+  const inp = document.getElementById("new-loc");
+  const n = inp.value.trim(); if (!n) return;
+  const id = uid();
+  data.locs[id] = { id, name: n, u: now(), del: 0 };
+  inp.value = ""; persist(); toast("Dodano miejsce ✅");
+}
+function renameLocation(id){
+  const l = data.locs[id]; if (!l) return;
+  const n = prompt("Nowa nazwa miejsca:", l.name);
+  if (n && n.trim()) { l.name = n.trim(); l.u = now(); persist(); }
+}
+function deleteLocation(id){
+  const cnt = activeItems().filter(i => i.loc === id).length;
+  if (cnt) { toast(`Najpierw przenieś ${cnt} poz. sprzętu z tego miejsca`); return; }
+  if (!confirm(`Usunąć miejsce „${data.locs[id].name}”?`)) return;
+  data.locs[id].del = 1; data.locs[id].u = now(); persist();
+}
+
+// ---------- eksport CSV ----------
+function exportCSV(){
+  const rows = [["Nazwa", "Miejsce", "Ilość", "Dostępne", "Kto ma", "Notatka"]];
+  activeItems().sort((a, b) => a.name.localeCompare(b.name, "pl")).forEach(it => {
+    rows.push([it.name, locName(it.loc), it.qty || 1, availCount(it),
+      itemLoans(it.id).map(l => `${l.who}${(l.n || 1) > 1 ? " ×" + l.n : ""}`).join("; "), it.note || ""]);
+  });
+  const csv = "﻿" + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = "magazyn.csv"; a.click();
+}
+function hardResetLocal(){
+  if (!confirm("Usunąć WSZYSTKIE dane zapisane na tym urządzeniu? (dane w chmurze zostają)")) return;
+  localStorage.clear(); location.reload();
+}
+
+// ---------- synchronizacja przez Gist ----------
+const GH = t => ({ Authorization: "Bearer " + t, Accept: "application/vnd.github+json" });
+let pushTimer = null, syncing = false;
+function setDot(cls, msg){
+  const d = document.getElementById("sync-dot");
+  d.className = "dot " + (cls || "");
+  if (msg !== undefined) document.getElementById("sync-status").textContent = msg;
+}
+function schedulePush(){
+  const c = cfg(); if (!c.token) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => syncNow(true), 1800);
+}
+async function syncNow(silent){
+  const c = cfg();
+  if (!c.token) { if (!silent) { toast("Najpierw ustaw token w Ustawieniach"); showTab("set"); } return; }
+  if (syncing) { schedulePush(); return; }
+  syncing = true; setDot("busy", "Synchronizuję…");
+  try {
+    // 1. pobierz zdalne
+    let remote = null, exists = false;
+    if (c.gist) {
+      const r = await fetch("https://api.github.com/gists/" + c.gist, { headers: GH(c.token) });
+      if (r.status === 404) throw new Error("Zły Gist ID (404)");
+      if (r.status === 401) throw new Error("Zły token (401)");
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      const f = j.files && j.files[GIST_FILE];
+      exists = true;
+      if (f) {
+        let txt = f.content;
+        if (f.truncated) txt = await (await fetch(f.raw_url)).text();
+        try { remote = JSON.parse(txt); } catch (e) { remote = null; }
+      }
+    }
+    // 2. scal
+    data = mergeData(data, remote);
+    pruneOld(data);
+    localStorage.setItem(LS.data, JSON.stringify(data));
+    // 3. wyślij, jeśli były lokalne zmiany albo gist nie istnieje
+    const dirty = localStorage.getItem(LS.dirty) === "1";
+    if (dirty || !exists) {
+      const body = JSON.stringify({
+        description: GIST_DESC, public: false,
+        files: { [GIST_FILE]: { content: JSON.stringify(data) } }
+      });
+      const url = c.gist ? "https://api.github.com/gists/" + c.gist : "https://api.github.com/gists";
+      const r2 = await fetch(url, { method: c.gist ? "PATCH" : "POST", headers: GH(c.token), body });
+      if (!r2.ok) throw new Error("Zapis: HTTP " + r2.status + (r2.status === 401 ? " (zły token)" : ""));
+      const j2 = await r2.json();
+      if (!c.gist && j2.id) {
+        localStorage.setItem(LS.gist, j2.id);
+        document.getElementById("set-gist").value = j2.id;
+      }
+      localStorage.setItem(LS.dirty, "0");
+    }
+    localStorage.setItem(LS.lastSync, String(now()));
+    setDot("ok", "Zsynchronizowano " + fmtTs(now()) + " ✅");
+    renderAll();
+  } catch (e) {
+    setDot("bad", "Błąd synchronizacji: " + e.message +
+      (navigator.onLine ? "" : " (brak internetu — zmiany zapisane lokalnie)"));
+    if (!silent) toast("⚠️ " + e.message);
+  } finally {
+    syncing = false;
+  }
+}
+function saveSync(){
+  localStorage.setItem(LS.token, document.getElementById("set-token").value.trim());
+  localStorage.setItem(LS.gist, document.getElementById("set-gist").value.trim());
+  toast("Zapisano ✅ — synchronizuję…");
+  localStorage.setItem(LS.dirty, localStorage.getItem(LS.dirty) || "1");
+  syncNow();
+}
+function shareSetup(){
+  const c = cfg();
+  if (!c.gist) { toast("Najpierw zsynchronizuj (żeby powstał Gist)"); return; }
+  const url = location.origin + location.pathname + "#g=" + c.gist;
+  const txt = `Aplikacja Magazyn: ${url}\nOtwórz na telefonie, wpisz swoje imię i wklej token (dostaniesz osobno).`;
+  if (navigator.share) navigator.share({ title: "Magazyn", text: txt }).catch(() => {});
+  else { navigator.clipboard.writeText(txt); toast("Skopiowano link do schowka 📋"); }
+}
+
+// ---------- start ----------
+function renderAll(){
+  renderWho(); renderItems(); renderOut(); renderLog(); renderLocs(); renderCartbar();
+}
+(function init(){
+  document.getElementById("app-ver").textContent = APP_VER;
+  // link zaproszenia #g=<gistId>
+  const m = location.hash.match(/#g=([A-Za-z0-9]+)/);
+  if (m && !cfg().gist) {
+    localStorage.setItem(LS.gist, m[1]);
+    history.replaceState(null, "", location.pathname);
+    showTab("set");
+    toast("Gist ID ustawiony — wpisz imię i token 👇");
+  }
+  const c = cfg();
+  document.getElementById("set-token").value = c.token;
+  document.getElementById("set-gist").value = c.gist;
+  renderAll();
+  if (!c.name && !m) askName();
+  if (c.token) syncNow(true);
+  // auto-sync: co 60 s gdy apka widoczna + przy powrocie do apki
+  setInterval(() => { if (document.visibilityState === "visible" && cfg().token) syncNow(true); }, 60000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && cfg().token) syncNow(true);
+  });
+  window.addEventListener("online", () => { if (cfg().token) syncNow(true); });
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+})();
+</script>
+</body>
+</html>
