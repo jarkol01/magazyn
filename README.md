@@ -13,9 +13,16 @@ kto co zabrał na montaż i kiedy oddał.
   potem potwierdzasz jednym przyciskiem (z opcjonalnym „dokąd”). Wszyscy widzą,
   że sprzęt jest w terenie i u kogo.
 - **Zwrot ↩️** — po powrocie oddajesz sprzęt, wybierając gdzie go odkładasz.
+- **Mapa 🗺️** — plan warsztatu ze ścianami, szafkami i obiektami. Przy braniu
+  i zwrocie sprzętu mini-mapa podświetla, gdzie sprzęt leży / gdzie go odłożyć.
+  Stuknięcie magazynu na mapie pokazuje jego zawartość. „Edytuj mapę” pozwala
+  dorysować ściany, magazyny i obiekty palcem (przesuwanie, zmiana rozmiaru).
 - **W terenie** — podgląd kto aktualnie co ma.
 - **Historia** — pełny log ruchów (kto, co, kiedy, dokąd).
 - **Eksport CSV** — do Excela, w Ustawieniach.
+
+Przy pierwszym uruchomieniu aplikacja jest wypełniona przykładowym sprzętem
+i domyślną mapą — wystarczy edytować/usunąć pozycje i dopasować plan do warsztatu.
 
 ## Instalacja na telefonie (PWA)
 

@@ -26,12 +26,19 @@ Model danych (Gist, `magazyn.json`):
 { v:1,
   items: {id: {id,name,loc,qty,note,u,del,by}},      // sprzęt (del=1 → tombstone)
   loans: {id: {id,itemId,who,n,dest,ts,retAt,retBy,retLoc,u}},  // wypożyczenia = też historia
-  locs:  {id: {id,name,u,del}} }                     // magazyny/miejsca
+  locs:  {id: {id,name,u,del}},                      // magazyny/miejsca
+  map:   {id: {id,kind:'wall'|'loc'|'obj',x,y,w,h,locId,label,u,del}} }  // plan warsztatu (SVG 100×70)
 ```
 - `u` = znacznik ostatniej zmiany rekordu (ms). **Merge = per-rekord, nowsze `u` wygrywa**,
   kolekcje scalane unią. Usunięcia przez tombstone (`del:1`/`retAt`), pruning po 180 dniach.
-- Domyślne miejsca mają STAŁE id (`loc-a/b/c`) i `u:1` — inaczej każde świeże urządzenie
-  tworzyłoby duplikaty przy pierwszym merge'u.
+- Dane startowe (miejsca `loc-a/b/c`, przykładowy sprzęt `it-01..12`, mapa `map-*`)
+  mają STAŁE id i `u:1` — inaczej każde świeże urządzenie tworzyłoby duplikaty przy
+  pierwszym merge'u; `u:1` gwarantuje, że chmura (edycje/usunięcia) zawsze wygrywa.
+  Te same defaulty siedzą w seedzie Gista — przy zmianie defaultów zaktualizuj też Gist
+  (skrypt: wyekstrahuj `defaultLocs/Items/MapEls` z app.js → `gh gist edit`).
+- Mapa: zakładka z edytorem (rysowanie prostokątów palcem, move/resize przez pointer
+  events na SVG, snap 1 jedn.); elementy `loc` linkują do `locs` przez `locId`.
+  Mini-mapy (`miniMap(hlLocIds)`) podświetlają miejsca w dialogach brania/koszyka/zwrotu.
 - Sync: pull → merge → push (tylko gdy `mg_dirty`), debounce 1,8 s po zmianie,
   auto co 60 s gdy karta widoczna + na `visibilitychange`/`online`.
 - Stan na urządzeniu: localStorage (`mg_*`), tryb offline działa w pełni.
